@@ -100,11 +100,75 @@ def encoding_layer(rnn_inputs, rnn_size, num_layers, keep_prob,
     # TODO: Implement Function
     encoded_embedded_input = tf.contrib.layers.embed_sequence(rnn_inputs, source_vocab_size,encoding_embedding_size)
     def make_cell(rnn_size):
-        encoded_cell = tf.contrib.rnn.LSTMCell(rnn_size,
-                                           initializer=tf.random_uniform_initializer(-0.1, 0.1, seed=2))
+        encoded_cell = tf.contrib.rnn.LSTMCell(rnn_size, initializer=tf.random_uniform_initializer(-0.1, 0.1, seed=2))
         return encoded_cell
     
     encoded_cell = tf.contrib.rnn.MultiRNNCell([make_cell(rnn_size) for _ in range(num_layers)])
     RNN_output, RNN_state = tf.nn.dynamic_rnn(encoded_cell, encoded_embedded_input, sequence_length=source_sequence_length, dtype=tf.float32)
     
     return RNN_output, RNN_state
+
+
+def decoding_layer_train(encoder_state, dec_cell, dec_embed_input, 
+                         target_sequence_length, max_summary_length, 
+                         output_layer, keep_prob):
+    """
+    Create a decoding layer for training
+    :param encoder_state: Encoder State
+    :param dec_cell: Decoder RNN Cell
+    :param dec_embed_input: Decoder embedded input
+    :param target_sequence_length: The lengths of each sequence in the target batch
+    :param max_summary_length: The length of the longest sequence in the batch
+    :param output_layer: Function to apply the output layer
+    :param keep_prob: Dropout keep probability
+    :return: BasicDecoderOutput containing training logits and sample_id
+    """
+    training_helper = tf.contrib.seq2seq.TrainingHelper(inputs=dec_embed_input,
+                                                            sequence_length=target_sequence_length,
+                                                            time_major=False)
+        
+        
+    # Basic decoder
+    training_decoder = tf.contrib.seq2seq.BasicDecoder(dec_cell, training_helper, encoder_state, output_layer) 
+        
+    # Perform dynamic decoding using the decoder
+    training_decoder_output, _ = tf.contrib.seq2seq.dynamic_decode(training_decoder,
+                                                                       impute_finished=True,
+                                                                       maximum_iterations=max_summary_length)
+    return training_decoder_output
+
+def decoding_layer_infer(encoder_state, dec_cell, dec_embeddings, start_of_sequence_id,
+                         end_of_sequence_id, max_target_sequence_length,
+                         vocab_size, output_layer, batch_size, keep_prob):
+    """
+    Create a decoding layer for inference
+    :param encoder_state: Encoder state
+    :param dec_cell: Decoder RNN Cell
+    :param dec_embeddings: Decoder embeddings
+    :param start_of_sequence_id: GO ID
+    :param end_of_sequence_id: EOS Id
+    :param max_target_sequence_length: Maximum length of target sequences
+    :param vocab_size: Size of decoder/target vocabulary
+    :param decoding_scope: TenorFlow Variable Scope for decoding
+    :param output_layer: Function to apply the output layer
+    :param batch_size: Batch size
+    :param keep_prob: Dropout keep probability
+    :return: BasicDecoderOutput containing inference logits and sample_id
+    """
+    
+    start_tokens = tf.tile(tf.constant([target_vocab_to_int['<GO>']], dtype=tf.int32), [batch_size], name='start_tokens')
+    
+    inference_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(dec_embeddings, start_tokens, target_vocab_to_int['<EOS>'])
+    
+    inference_decoder = tf.contrib.seq2seq.BasicDecoder(dec_cell, inference_helper, encoder_state, output_layer)
+    
+    inference_decoder_output, _ = tf.contrib.seq2seq.dynamic_decode(inference_decoder,
+                                                            impute_finished=True,
+                                                            maximum_iterations=max_target_sequence_length)
+    
+    return inference_decoder_output
+
+
+
+
+
