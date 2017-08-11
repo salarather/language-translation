@@ -217,3 +217,40 @@ def decoding_layer(dec_input, encoder_state,
         
     return training_logits, inference_logits
 
+
+
+def seq2seq_model(input_data, target_data, keep_prob, batch_size,
+                  source_sequence_length, target_sequence_length,
+                  max_target_sentence_length,
+                  source_vocab_size, target_vocab_size,
+                  enc_embedding_size, dec_embedding_size,
+                  rnn_size, num_layers, target_vocab_to_int):
+    """
+    Build the Sequence-to-Sequence part of the neural network
+    :param input_data: Input placeholder
+    :param target_data: Target placeholder
+    :param keep_prob: Dropout keep probability placeholder
+    :param batch_size: Batch Size
+    :param source_sequence_length: Sequence Lengths of source sequences in the batch
+    :param target_sequence_length: Sequence Lengths of target sequences in the batch
+    :param source_vocab_size: Source vocabulary size
+    :param target_vocab_size: Target vocabulary size
+    :param enc_embedding_size: Decoder embedding size
+    :param dec_embedding_size: Encoder embedding size
+    :param rnn_size: RNN Size
+    :param num_layers: Number of layers
+    :param target_vocab_to_int: Dictionary to go from the target words to an id
+    :return: Tuple of (Training BasicDecoderOutput, Inference BasicDecoderOutput)
+    """
+    _, enc_state = encoding_layer(input_data, rnn_size, num_layers, keep_prob, source_sequence_length, 
+                                  source_vocab_size, enc_embedding_size)
+    
+    processed_target_data = process_decoder_input(target_data, target_vocab_to_int, batch_size)
+    
+    training_logits, inference_logits = decoding_layer(processed_target_data, enc_state, target_sequence_length,
+                                                       max_target_sentence_length, rnn_size, num_layers, target_vocab_to_int, 
+                                                       target_vocab_size, batch_size, keep_prob, dec_embedding_size)
+    
+    
+    return training_logits, inference_logits
+
